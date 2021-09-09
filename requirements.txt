@@ -1,0 +1,4 @@
+pyasn
+requests
+frozendict
+types-frozendict
