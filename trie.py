@@ -54,11 +54,11 @@ def _bools_to_ip(addr_type: IPVersion, bools: Iterable[bool]) -> Any:
 
 
 def bools_to_ipv4(bools: Iterable[bool]) -> ipaddress.IPv4Network:
-    return _bools_to_ip('4', bools)
+    return _bools_to_ip(IPVersion.v4, bools)
 
 
 def bools_to_ipv6(bools: Iterable[bool]) -> ipaddress.IPv6Network:
-    return _bools_to_ip('6', bools)
+    return _bools_to_ip(IPVersion.v6, bools)
 
 
 class Node(object):
@@ -122,8 +122,7 @@ class Trie(object):
 
             if current.value:  # entry with shorter prefixlen already exists
                 if error_on_conflict:
-                    addr_f = bools_to_ipv4 if addr_type == IPVersion.v4 else bools_to_ipv6
-                    raise ValueError(f'conflict inserting {addr_f(it)}')
+                    raise ValueError(f'conflict inserting {_bools_to_ip(addr_type, it)}')
                 return
 
             direction = 'right' if bit else 'left'
