@@ -10,6 +10,7 @@ from typing import Optional, Iterable, Generator, Union, Any
 
 _shifts = list(range(7, -1, -1))
 _masks = [1 << i for i in _shifts]
+_sentinel = object()
 
 
 class IPVersion(enum.IntEnum):
@@ -62,7 +63,7 @@ def bools_to_ipv6(bools: Iterable[bool]) -> ipaddress.IPv6Network:
 
 
 class Node(object):
-    def __init__(self, left: Optional['Node'] = None, right: Optional['Node'] = None, value: Any = False) -> None:
+    def __init__(self, left: Optional['Node'] = None, right: Optional['Node'] = None, value: Any = _sentinel) -> None:
         self.left = left
         self.right = right
         self.value = value
@@ -76,12 +77,18 @@ class Node(object):
         if len(prev_bits) > max_prefix_len:
             raise ValueError(f'prefix over {max_prefix_len} bits')
 
-        if self.value:
+        if self.value is not _sentinel:
             yield (prev_bits, self.value)
         else:
-            for i, child in enumerate(getattr(self, direction) for direction in ('left', 'right')):
-                if child:
-                    yield from child._get_entries(addr_type, prev_bits + (bool(i),))
+            yield from (
+                entry
+                for bit, child in enumerate(
+                    getattr(self, direction)
+                    for direction in ('left', 'right')
+                )
+                if child
+                for entry in child._get_entries(addr_type, prev_bits + (bool(bit),))
+            )
 
     def _merge_entries(self, n_type: IPVersion, cur_len: int) -> None:
         max_len = 32 if n_type == IPVersion.v4 else 128
@@ -89,16 +96,21 @@ class Node(object):
             raise ValueError('Too deep in trie')
 
         num_children = 0
-        for direction in ('left', 'right'):
-            child = getattr(self, direction, None)
-            if child:
-                child._merge_entries(n_type, cur_len + 1)
-                num_children += 1
+        for child in (
+            child
+            for child in (
+                getattr(self, direction, None)
+                for direction in ('left', 'right')
+            )
+            if child
+        ):
+            child._merge_entries(n_type, cur_len + 1)
+            num_children += 1
 
         if num_children == 2:
             assert self.left and self.right
             l_value = self.left.value
-            if l_value and l_value == self.right.value:
+            if l_value is not _sentinel and l_value == self.right.value:
                 self.left = None
                 self.right = None
                 self.value = l_value
@@ -120,7 +132,7 @@ class Trie(object):
             if prefix_len > max_prefix_len:
                 raise ValueError(f'prefix over {max_prefix_len} bits')
 
-            if current.value:  # entry with shorter prefixlen already exists
+            if current.value is not _sentinel:  # entry with shorter prefixlen already exists
                 if error_on_conflict:
                     raise ValueError(f'conflict inserting {_bools_to_ip(addr_type, it)}')
                 return

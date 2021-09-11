@@ -72,15 +72,20 @@ def record_changes(record: dict[str, Any], ignored_fields: Iterable[str] = ('reg
 
     if r_type == 'ipv6':
         yield record | {'subnet': f'{start}/{value}'}
+
     elif r_type == 'asn':
         start_i = int(start)
-        for asn in range(start_i, start_i + value):
-            yield record | {'asn': asn}
+        yield from (
+            record | {'asn': asn}
+            for asn in range(start_i, start_i + value)
+        )
+
     elif r_type == 'ipv4':
         yield from (
             record | {'subnet': subnet}
             for subnet in ipv4_range_to_subnets(start, value)
         )
+
     else:
         raise ValueError(f'unknown {r_type=}')
 
